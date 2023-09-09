@@ -1,5 +1,7 @@
 ARG base_img
-FROM nvidia/cuda:10.1-devel-centos7 as build
+FROM nvidia/cuda:11.0.3-devel-centos7 as build
+#FROM nvidia/cuda:11.0.3-devel-ubuntu20.04 as build
+#FROM nvidia/cuda:10.1-devel-centos7 as build
 
 ARG version
 ARG commit
@@ -7,8 +9,10 @@ ARG commit
 RUN yum install -y rpm-build make
 
 # default git has problems while cloning some repository
-RUN yum install -y https://repo.ius.io/ius-release-el7.rpm \
-  && yum install -y git222
+RUN yum install -y https://repo.ius.io/ius-release-el7.rpm\
+  && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm\
+  && yum remove -y git\
+  && yum install -y git236
 
 ENV GOLANG_VERSION 1.14.3
 RUN curl -sSL https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz \
