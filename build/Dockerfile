@@ -9,17 +9,18 @@ ARG commit
 RUN yum install -y rpm-build make
 
 # default git has problems while cloning some repository
-RUN yum install -y https://repo.ius.io/ius-release-el7.rpm\
-  && yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm\
-  && yum remove -y git\
-  && yum install -y git236
-
+RUN yum install -y https://repo.ius.io/ius-release-el7.rpm
+RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+RUN yum remove -y git
+RUN yum install -y git236
 ENV GOLANG_VERSION 1.14.3
 RUN curl -sSL https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz \
     | tar -C /usr/local -xz
 ENV GOPATH /go
 ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
 
+RUN export GOPROXY=https://goproxy.cn,direct
+RUN export GO111MODULE=on
 RUN mkdir -p /root/rpmbuild/{SPECS,SOURCES}
 
 COPY gpu-manager.spec /root/rpmbuild/SPECS
@@ -29,6 +30,8 @@ RUN echo '%_topdir /root/rpmbuild' > /root/.rpmmacros \
   && echo '%__os_install_post %{nil}' >> /root/.rpmmacros \
   && echo '%debug_package %{nil}' >> /root/.rpmmacros
 WORKDIR /root/rpmbuild/SPECS
+
+RUN go env -w GOPROXY=https://goproxy.cn,direct
 RUN rpmbuild -bb --quiet \
   --define 'version '${version}'' \
   --define 'commit '${commit}'' \
