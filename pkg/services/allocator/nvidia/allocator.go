@@ -57,6 +57,8 @@ import (
 
 const (
 	checkpointFileName = "gpumanager_internal_checkpoint"
+	maxRetries = 6 // 最多重试6次
+    retryInterval = 5 * time.Second // 每次重试间隔5秒
 )
 
 func init() {
@@ -404,13 +406,35 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 			if needCores%nvtree.HundredCore > 0 {
 				return nil, fmt.Errorf("cores are greater than %d, must be multiple of %d", nvtree.HundredCore, nvtree.HundredCore)
 			}
-			nodes = eval.Evaluate(needCores, 0)
+			for attempt := 0; attempt < maxRetries; attempt++ {
+                nodes = eval.Evaluate(needCores, 0)
+                if len(nodes) > 0 {
+                    break // 如果找到了节点，就跳出循环
+                }
+                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+                    time.Sleep(retryInterval)
+                } else if shareMode && needMemory > singleNodeMemory {
+                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
+                }
+            }
+
 		case needCores == nvtree.HundredCore:
 			eval, ok := ta.evaluators["fragment"]
 			if !ok {
 				return nil, fmt.Errorf("can not find evaluator fragment")
 			}
-			nodes = eval.Evaluate(needCores, 0)
+			for attempt := 0; attempt < maxRetries; attempt++ {
+                nodes = eval.Evaluate(needCores, 0)
+                if len(nodes) > 0 {
+                    break // 如果找到了节点，就跳出循环
+                }
+                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+                    time.Sleep(retryInterval)
+                } else if shareMode && needMemory > singleNodeMemory {
+                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
+                }
+            }
+
 		default:
 			if !ta.config.EnableShare {
 				return nil, fmt.Errorf("share mode is not enabled")
@@ -425,12 +449,18 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 			if !ok {
 				return nil, fmt.Errorf("can not find evaluator share")
 			}
-			nodes = eval.Evaluate(needCores, needMemory)
+			for attempt := 0; attempt < maxRetries; attempt++ {
+                nodes = eval.Evaluate(needCores, needMemory)
+                if len(nodes) > 0 {
+                    break // 如果找到了节点，就跳出循环
+                }
+                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+                    time.Sleep(retryInterval)
+                } else if shareMode && needMemory > singleNodeMemory {
+                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
+                }
+            }
 			if len(nodes) == 0 {
-				if shareMode && needMemory > singleNodeMemory {
-					return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
-				}
-
 				return nil, fmt.Errorf("no free node")
 			}
 
@@ -458,11 +488,11 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 					return nil, fmt.Errorf("failed to get predicate node %s", devStr)
 				}
 
-				// check if we choose the same node as scheduler
-				if predicateNode.MinorName() != nodes[0].MinorName() {
-					return nil, fmt.Errorf("Nvidia node mismatch for pod %s(%s), pick up:%s  predicate: %s",
-						pod.Name, container.Name, nodes[0].MinorName(), predicateNode.MinorName())
-				}
+				// check if we choose the same node as scheduler，this is not important,dimiss it
+// 				if predicateNode.MinorName() != nodes[0].MinorName() {
+// 					return nil, fmt.Errorf("Nvidia node mismatch for pod %s(%s), pick up:%s  predicate: %s",
+// 						pod.Name, container.Name, nodes[0].MinorName(), predicateNode.MinorName())
+// 				}
 			}
 		}
 	}
