@@ -413,8 +413,6 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
                 }
                 if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
                     time.Sleep(retryInterval)
-                } else if shareMode && needMemory > singleNodeMemory {
-                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
                 }
             }
 
@@ -430,8 +428,6 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
                 }
                 if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
                     time.Sleep(retryInterval)
-                } else if shareMode && needMemory > singleNodeMemory {
-                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
                 }
             }
 
@@ -456,11 +452,12 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
                 }
                 if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
                     time.Sleep(retryInterval)
-                } else if shareMode && needMemory > singleNodeMemory {
-                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
                 }
             }
 			if len(nodes) == 0 {
+                if shareMode && needMemory > singleNodeMemory {
+                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
+                }
 				return nil, fmt.Errorf("no free node")
 			}
 
@@ -501,7 +498,6 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 		if shareMode && needMemory > singleNodeMemory {
 			return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
 		}
-
 		return nil, fmt.Errorf("no free node")
 	}
 
