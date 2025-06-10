@@ -45,13 +45,20 @@ RUN rpmbuild -bb --quiet \
   --define 'version '${version}'' \
   --define 'commit '${commit}'' \
   gpu-manager.spec
-#
-#FROM $base_img
-#
-#ARG version
-#ARG commit
 
-RUN mv /root/rpmbuild/RPMS/x86_64/gpu-manager-${version}-${commit}.el7.x86_64.rpm /tmp
+#
+FROM $base_img
+
+ARG version
+ARG commit
+
+COPY --from=build /root/rpmbuild/RPMS/x86_64/gpu-manager-${version}-${commit}.el7.x86_64.rpm /tmp
+#RUN mv /root/rpmbuild/RPMS/x86_64/gpu-manager-${version}-${commit}.el7.x86_64.rpm /tmp
+
+RUN curl -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo
+RUN sed -i -e '/mirrors.cloud.aliyuncs.com/d' -e '/mirrors.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
+
+RUN yum makecache
 
 RUN yum install epel-release -y && \
   yum install -y which jq
