@@ -29,13 +29,13 @@ type fragmentMode struct {
 	tree *nvidia.NvidiaTree
 }
 
-//NewFragmentMode returns a new fragmentMode struct.
+// NewFragmentMode returns a new fragmentMode struct.
 //
-//Evaluate() of fragmentMode returns nodes with minimum available cores
-//which fullfil the request.
+// Evaluate() of fragmentMode returns nodes with minimum available cores
+// which fullfil the request.
 //
-//Fragment mode means to allocate cores on fragmented nodes first, which
-//helps link mode work better.
+// Fragment mode means to allocate cores on fragmented nodes first, which
+// helps link mode work better.
 func NewFragmentMode(t *nvidia.NvidiaTree) *fragmentMode {
 	return &fragmentMode{t}
 }
@@ -60,7 +60,7 @@ func (al *fragmentMode) Evaluate(cores int64, _ int64) []*nvidia.NvidiaNode {
 			}
 
 			candidate = node
-			klog.V(2).Infof("Choose id %d, mask %b", candidate.Meta.ID, candidate.Mask)
+			klog.V(2).Infof("Choose id %d, mask %b, numa: %d", candidate.Meta.ID, candidate.Mask, candidate.Meta.NUMAID)
 			break
 		}
 	}

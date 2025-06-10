@@ -168,13 +168,13 @@ func TestServer(t *testing.T) {
 	tree, _ := obj.(*nvidia.NvidiaTree)
 
 	testCase1 :=
-		`    GPU0    GPU1    GPU2    GPU3    GPU4    GPU5
-GPU0      X      PIX     PHB     PHB     SOC     SOC
-GPU1     PIX      X      PHB     PHB     SOC     SOC
-GPU2     PHB     PHB      X      PIX     SOC     SOC
-GPU3     PHB     PHB     PIX      X      SOC     SOC
-GPU4     SOC     SOC     SOC     SOC      X      PIX
-GPU5     SOC     SOC     SOC     SOC     PIX      X
+	`    GPU0    GPU1    GPU2    GPU3    GPU4    GPU5    NUMA Affinity
+GPU0      X      PIX     PHB     PHB     SOC     SOC	     0
+GPU1     PIX      X      PHB     PHB     SOC     SOC	     0
+GPU2     PHB     PHB      X      PIX     SOC     SOC	     0
+GPU3     PHB     PHB     PIX      X      SOC     SOC	     1
+GPU4     SOC     SOC     SOC     SOC      X      PIX         1
+GPU5     SOC     SOC     SOC     SOC     PIX      X          1
 `
 	tree.Init(testCase1)
 	for _, n := range tree.Leaves() {

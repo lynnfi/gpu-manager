@@ -42,7 +42,7 @@ import (
 	"tkestack.io/gpu-manager/pkg/utils"
 
 	"golang.org/x/net/context"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,8 +57,8 @@ import (
 
 const (
 	checkpointFileName = "gpumanager_internal_checkpoint"
-	maxRetries = 6 // 最多重试6次
-    retryInterval = 5 * time.Second // 每次重试间隔5秒
+	maxRetries         = 6               // 最多重试6次
+	retryInterval      = 5 * time.Second // 每次重试间隔5秒
 )
 
 func init() {
@@ -66,7 +66,7 @@ func init() {
 	allocator.Register("nvidia_test", NewNvidiaTopoAllocatorForTest)
 }
 
-//NvidiaTopoAllocator is an allocator for Nvidia GPU
+// NvidiaTopoAllocator is an allocator for Nvidia GPU
 type NvidiaTopoAllocator struct {
 	sync.Mutex
 
@@ -103,7 +103,7 @@ var (
 	waitTimeout                          = 10 * time.Second
 )
 
-//NewNvidiaTopoAllocator returns a new NvidiaTopoAllocator
+// NewNvidiaTopoAllocator returns a new NvidiaTopoAllocator
 func NewNvidiaTopoAllocator(config *config.Config,
 	tree device.GPUTree,
 	k8sClient kubernetes.Interface,
@@ -147,8 +147,8 @@ func NewNvidiaTopoAllocator(config *config.Config,
 	return alloc
 }
 
-//NewNvidiaTopoAllocatorForTest returns a new NvidiaTopoAllocator
-//with fake docker client, just for testing.
+// NewNvidiaTopoAllocatorForTest returns a new NvidiaTopoAllocator
+// with fake docker client, just for testing.
 func NewNvidiaTopoAllocatorForTest(config *config.Config,
 	tree device.GPUTree,
 	k8sClient kubernetes.Interface,
@@ -317,28 +317,54 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		gpuDevices, memoryDevices []*pluginapi.Device
 		totalMemory               int64
 	)
-
+	// numa id 默认0
+	numa := 0
 	nodes := ta.tree.Leaves()
+	// 所有的核心数
+	totalCores := len(nodes) * nvtree.HundredCore
+	gpuDevices = make([]*pluginapi.Device, totalCores)
+	// 所有的显存量
 	for i := range nodes {
 		totalMemory += int64(nodes[i].Meta.TotalMemory)
 	}
-
-	totalCores := len(nodes) * nvtree.HundredCore
-	gpuDevices = make([]*pluginapi.Device, totalCores)
-	for i := 0; i < totalCores; i++ {
-		gpuDevices[i] = &pluginapi.Device{
-			ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, i),
-			Health: pluginapi.Healthy,
-		}
-	}
-
 	totalMemoryBlocks := totalMemory / types.MemoryBlockSize
 	memoryDevices = make([]*pluginapi.Device, totalMemoryBlocks)
-	for i := int64(0); i < totalMemoryBlocks; i++ {
-		memoryDevices[i] = &pluginapi.Device{
-			ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, i),
-			Health: pluginapi.Healthy,
+	// 添加numaid相关拓扑信息
+	for i := range nodes {
+		nodeMemory := int64(nodes[i].Meta.TotalMemory)
+		// 取当前节点的numa id
+		numa = nodes[i].Meta.NUMAID
+		nodeMemoryBlocks := nodeMemory / types.MemoryBlockSize
+		nodegpus := nvtree.HundredCore
+
+		for i := 0; i < nodegpus; i++ {
+			gpuDevices[i] = &pluginapi.Device{
+				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, i),
+				Health: pluginapi.Healthy,
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: int64(numa),
+						},
+					},
+				},
+			}
 		}
+
+		for i := int64(0); i < nodeMemoryBlocks; i++ {
+			memoryDevices[i] = &pluginapi.Device{
+				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, i),
+				Health: pluginapi.Healthy,
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: int64(numa),
+						},
+					},
+				},
+			}
+		}
+
 	}
 
 	devs = append(devs, gpuDevices...)
@@ -407,14 +433,14 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				return nil, fmt.Errorf("cores are greater than %d, must be multiple of %d", nvtree.HundredCore, nvtree.HundredCore)
 			}
 			for attempt := 0; attempt < maxRetries; attempt++ {
-                nodes = eval.Evaluate(needCores, 0)
-                if len(nodes) > 0 {
-                    break // 如果找到了节点，就跳出循环
-                }
-                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
-                    time.Sleep(retryInterval)
-                }
-            }
+				nodes = eval.Evaluate(needCores, 0)
+				if len(nodes) > 0 {
+					break // 如果找到了节点，就跳出循环
+				}
+				if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+					time.Sleep(retryInterval)
+				}
+			}
 
 		case needCores == nvtree.HundredCore:
 			eval, ok := ta.evaluators["fragment"]
@@ -422,14 +448,14 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				return nil, fmt.Errorf("can not find evaluator fragment")
 			}
 			for attempt := 0; attempt < maxRetries; attempt++ {
-                nodes = eval.Evaluate(needCores, 0)
-                if len(nodes) > 0 {
-                    break // 如果找到了节点，就跳出循环
-                }
-                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
-                    time.Sleep(retryInterval)
-                }
-            }
+				nodes = eval.Evaluate(needCores, 0)
+				if len(nodes) > 0 {
+					break // 如果找到了节点，就跳出循环
+				}
+				if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+					time.Sleep(retryInterval)
+				}
+			}
 
 		default:
 			if !ta.config.EnableShare {
@@ -446,18 +472,18 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				return nil, fmt.Errorf("can not find evaluator share")
 			}
 			for attempt := 0; attempt < maxRetries; attempt++ {
-                nodes = eval.Evaluate(needCores, needMemory)
-                if len(nodes) > 0 {
-                    break // 如果找到了节点，就跳出循环
-                }
-                if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
-                    time.Sleep(retryInterval)
-                }
-            }
+				nodes = eval.Evaluate(needCores, needMemory)
+				if len(nodes) > 0 {
+					break // 如果找到了节点，就跳出循环
+				}
+				if attempt < maxRetries-1 { // 如果不是最后一次尝试，等待一段时间再重试
+					time.Sleep(retryInterval)
+				}
+			}
 			if len(nodes) == 0 {
-                if shareMode && needMemory > singleNodeMemory {
-                    return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
-                }
+				if shareMode && needMemory > singleNodeMemory {
+					return nil, fmt.Errorf("request memory %d is larger than %d", needMemory, singleNodeMemory)
+				}
 				return nil, fmt.Errorf("no free node")
 			}
 
@@ -486,10 +512,10 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				}
 
 				// check if we choose the same node as scheduler，this is not important,dimiss it
-// 				if predicateNode.MinorName() != nodes[0].MinorName() {
-// 					return nil, fmt.Errorf("Nvidia node mismatch for pod %s(%s), pick up:%s  predicate: %s",
-// 						pod.Name, container.Name, nodes[0].MinorName(), predicateNode.MinorName())
-// 				}
+				// 				if predicateNode.MinorName() != nodes[0].MinorName() {
+				// 					return nil, fmt.Errorf("Nvidia node mismatch for pod %s(%s), pick up:%s  predicate: %s",
+				// 						pod.Name, container.Name, nodes[0].MinorName(), predicateNode.MinorName())
+				// 				}
 			}
 		}
 	}
@@ -685,7 +711,7 @@ func (ta *NvidiaTopoAllocator) freeGPU(podUids []string) {
 }
 
 // #lizard forgives
-//Allocate tries to allocate GPU node for each request
+// Allocate tries to allocate GPU node for each request
 func (ta *NvidiaTopoAllocator) Allocate(_ context.Context, reqs *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	ta.Lock()
 	defer ta.Unlock()
@@ -793,12 +819,12 @@ func (ta *NvidiaTopoAllocator) Allocate(_ context.Context, reqs *pluginapi.Alloc
 	return resps, nil
 }
 
-//ListAndWatch is not implement
+// ListAndWatch is not implement
 func (ta *NvidiaTopoAllocator) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	return fmt.Errorf("not implement")
 }
 
-//ListAndWatchWithResourceName send devices for request resource back to server
+// ListAndWatchWithResourceName send devices for request resource back to server
 func (ta *NvidiaTopoAllocator) ListAndWatchWithResourceName(resourceName string, e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	devs := make([]*pluginapi.Device, 0)
 	for _, dev := range ta.capacity() {
@@ -819,14 +845,14 @@ func (ta *NvidiaTopoAllocator) ListAndWatchWithResourceName(resourceName string,
 	return nil
 }
 
-//GetDevicePluginOptions returns empty DevicePluginOptions
+// GetDevicePluginOptions returns empty DevicePluginOptions
 func (ta *NvidiaTopoAllocator) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	return &pluginapi.DevicePluginOptions{PreStartRequired: true}, nil
 }
 
-//PreStartContainer find the podUID by comparing request deviceids with deviceplugin
-//checkpoint data, then checks the validation of allocation of the pod.
-//Update pod annotation if check success, otherwise evict the pod.
+// PreStartContainer find the podUID by comparing request deviceids with deviceplugin
+// checkpoint data, then checks the validation of allocation of the pod.
+// Update pod annotation if check success, otherwise evict the pod.
 func (ta *NvidiaTopoAllocator) PreStartContainer(ctx context.Context, req *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	ta.Lock()
 	defer ta.Unlock()

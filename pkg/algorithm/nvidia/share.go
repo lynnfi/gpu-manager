@@ -29,13 +29,13 @@ type shareMode struct {
 	tree *nvidia.NvidiaTree
 }
 
-//NewShareMode returns a new shareMode struct.
+// NewShareMode returns a new shareMode struct.
 //
-//Evaluate() of shareMode returns one node with minimum available cores
-//which fullfil the request.
+// Evaluate() of shareMode returns one node with minimum available cores
+// which fullfil the request.
 //
-//Share mode means multiple application may share one GPU node which uses
-//GPU more efficiently.
+// Share mode means multiple application may share one GPU node which uses
+// GPU more efficiently.
 func NewShareMode(t *nvidia.NvidiaTree) *shareMode {
 	return &shareMode{t}
 }
@@ -55,7 +55,7 @@ func (al *shareMode) Evaluate(cores int64, memory int64) []*nvidia.NvidiaNode {
 
 	for _, node := range tmpStore {
 		if node.AllocatableMeta.Cores >= cores && node.AllocatableMeta.Memory >= memory {
-			klog.V(2).Infof("Pick up %d mask %b, cores: %d, memory: %d", node.Meta.ID, node.Mask, node.AllocatableMeta.Cores, node.AllocatableMeta.Memory)
+			klog.V(2).Infof("Pick up %d mask %b, cores: %d, memory: %d, numa: %d", node.Meta.ID, node.Mask, node.AllocatableMeta.Cores, node.AllocatableMeta.Memory, node.Meta.NUMAID)
 			nodes = append(nodes, node)
 			break
 		}
