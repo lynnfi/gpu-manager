@@ -42,7 +42,8 @@ function plugin::build_binary() {
 function plugin::generate_img() {
   readonly local commit=$(git log --no-merges --oneline | wc -l | sed -e 's,^[ \t]*,,')
   readonly local version=$(<"${ROOT}/VERSION")
-  readonly local base_img=${BASE_IMG:-"thomassong/vcuda:latest"}
+  readonly local base_img=${BASE_IMG:-"10.199.2.148:5000/robocloud/thomassong-vcuda:latest"}
+#  readonly local base_img=${BASE_IMG:-"thomassong/vcuda:latest"}
 #  readonly local base_img=${BASE_IMG:-"thomassong/vcuda:1.0.4"}
 
   mkdir -p "${ROOT}/go/build"
