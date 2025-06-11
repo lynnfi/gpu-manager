@@ -2,7 +2,7 @@ module tkestack.io/gpu-manager
 
 go 1.14
 
-replace tkestack.io/nvml => github.com/lynnfi/go-nvml v0.0.1
+replace tkestack.io/nvml => github.com/lynnfi/go-nvml v0.0.2
 
 require (
 	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
@@ -26,5 +26,5 @@ require (
 	k8s.io/klog v1.0.0
 	k8s.io/kubectl v0.17.4
 	k8s.io/kubelet v0.17.4
-	tkestack.io/nvml v0.0.1
+	tkestack.io/nvml v0.0.2
 )

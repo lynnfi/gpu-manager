@@ -20,13 +20,13 @@ RUN yum install -y rpm-build make
 
 #RUN yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
-RUN yum remove -y git
-RUN yum install -y git
-ENV GOLANG_VERSION 1.14.3
+#RUN yum remove -y git
+#RUN yum install -y git
+ENV GOLANG_VERSION=1.14.3
 RUN curl -sSL https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz \
     | tar -C /usr/local -xz
-ENV GOPATH /go
-ENV PATH $GOPATH/bin:/usr/local/go/bin:$PATH
+ENV GOPATH=/go
+ENV PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
 RUN export GOPROXY=https://goproxy.cn,direct
 RUN export GO111MODULE=on
