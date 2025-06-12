@@ -315,7 +315,7 @@ func (ta *NvidiaTopoAllocator) loadModule() {
 func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	var (
 		gpuDevices, memoryDevices []*pluginapi.Device
-		totalMemory               int64
+		totalMemoryBlocks         int64
 	)
 	nodes := ta.tree.Leaves()
 	// 所有的核心数
@@ -323,9 +323,9 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	gpuDevices = make([]*pluginapi.Device, totalCores)
 	// 所有的显存量
 	for i := range nodes {
-		totalMemory += int64(nodes[i].Meta.TotalMemory)
+		nodeMemory := int64(nodes[i].Meta.TotalMemory)
+		totalMemoryBlocks += nodeMemory / types.MemoryBlockSize
 	}
-	totalMemoryBlocks := totalMemory / types.MemoryBlockSize
 	klog.V(2).Infof("totalMemoryBlocks is %d", totalMemoryBlocks)
 	memoryDevices = make([]*pluginapi.Device, totalMemoryBlocks)
 	// 添加numaid相关拓扑信息
@@ -370,6 +370,7 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	devs = append(devs, gpuDevices...)
 	klog.V(2).Infof("The gpu devices num is %d", len(devs))
 	devs = append(devs, memoryDevices...)
+	klog.V(2).Infof("The memroy block num is %d", len(devs))
 	return devs
 }
 
@@ -827,16 +828,16 @@ func (ta *NvidiaTopoAllocator) ListAndWatch(e *pluginapi.Empty, s pluginapi.Devi
 // ListAndWatchWithResourceName send devices for request resource back to server
 func (ta *NvidiaTopoAllocator) ListAndWatchWithResourceName(resourceName string, e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	devs := make([]*pluginapi.Device, 0)
-	cnt := 0
 	klog.V(2).Infof("allocator-831 ,start deal the resource %s", resourceName)
-	for _, dev := range ta.capacity() {
-		if strings.HasPrefix(dev.ID, resourceName) {
-			devs = append(devs, dev)
-			if cnt%30 == 0 {
-				klog.V(2).Infof("add devID into list ans watch %s", dev.ID)
-				cnt = 1
+	cap := ta.capacity()
+	for i, dev := range cap {
+		if dev != nil {
+			if strings.HasPrefix(dev.ID, resourceName) {
+				devs = append(devs, dev)
+				if i%30 == 0 {
+					klog.V(2).Infof("add devID into list ans watch %s", dev.ID)
+				}
 			}
-			cnt++
 		}
 	}
 	klog.V(2).Infof("total devices num is %d", len(devs))
