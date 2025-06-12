@@ -91,6 +91,7 @@ func (t *NvidiaTree) Init(input string) {
 	err := t.parseFromLibrary()
 	if err == nil {
 		t.realMode = true
+		klog.V(2).Infof("parsed nv tree succeed")
 		return
 	}
 
@@ -169,6 +170,7 @@ func (t *NvidiaTree) addNode(node *NvidiaNode) {
 
 func (t *NvidiaTree) parseFromLibrary() error {
 	if err := nvml.Init(); err != nil {
+		klog.V(2).Infof("NVML Init ERRO")
 		return err
 	}
 
@@ -190,8 +192,13 @@ func (t *NvidiaTree) parseFromLibrary() error {
 		pciInfo, _ := dev.DeviceGetPciInfo()
 		minorID, _ := dev.DeviceGetMinorNumber()
 		uuid, _ := dev.DeviceGetUUID()
-		numaID, _ := dev.DeviceGetNumaNodeId()
-
+		numaID, numaErr := dev.DeviceGetNumaNodeId()
+		if numaErr != nil {
+			klog.V(2).Infof("get numaID failed,use default numaId=0")
+			klog.V(2).Infof("Error info is %v", numaErr)
+			numaID = 0
+		}
+		klog.V(2).Infof("For %d gpu info, numaID: %d, uuid: %s ", i, numaID, uuid)
 		n := t.allocateNode(i)
 		n.AllocatableMeta.Cores = HundredCore
 		n.AllocatableMeta.Memory = int64(totalMem)
@@ -199,7 +206,7 @@ func (t *NvidiaTree) parseFromLibrary() error {
 		n.Meta.BusId = pciInfo.BusID
 		n.Meta.MinorID = int(minorID)
 		n.Meta.UUID = uuid
-		n.Meta.NUMAID = int(numaID)
+		n.Meta.NUMAID = uint(numaID)
 
 		t.addNode(n)
 	}
@@ -367,6 +374,9 @@ func (t *NvidiaTree) buildTree(nodes LevelMap) {
 			cur = cur.Parent
 		}
 	}
+
+	// Print tree structure after it's fully built
+	klog.Infof("GPU Tree Structure after building:\n%s", t.PrintGraph())
 }
 
 func trimEmpty(splits []string) []string {
@@ -600,14 +610,14 @@ func printIter(w *bytes.Buffer, node *NvidiaNode, level int) {
 
 func printNode(node *NvidiaNode) string {
 	if node.ntype != nvml.TOPOLOGY_INTERNAL {
-		return fmt.Sprintf("%s (aval: %d, pids: %+v, usedMemory: %d, totalMemory: %d, allocatableCores: %d, allocatableMemory: %d)\n",
+		return fmt.Sprintf("%s (aval: %d, pids: %+v, usedMemory: %d, totalMemory: %d, allocatableCores: %d, allocatableMemory: %d, numaId: %d)\n",
 			node.String(), node.Available(), node.Meta.Pids, node.Meta.UsedMemory, node.Meta.TotalMemory,
-			node.AllocatableMeta.Cores, node.AllocatableMeta.Memory)
+			node.AllocatableMeta.Cores, node.AllocatableMeta.Memory, node.Meta.NUMAID)
 	}
 
-	return fmt.Sprintf("%s (pids: %+v, usedMemory: %d, totalMemory: %d, allocatableCores: %d, allocatableMemory: %d)\n",
+	return fmt.Sprintf("%s (pids: %+v, usedMemory: %d, totalMemory: %d, allocatableCores: %d, allocatableMemory: %d, numaId: %d)\n",
 		node.String(), node.Meta.Pids, node.Meta.UsedMemory, node.Meta.TotalMemory,
-		node.AllocatableMeta.Cores, node.AllocatableMeta.Memory)
+		node.AllocatableMeta.Cores, node.AllocatableMeta.Memory, node.Meta.NUMAID)
 }
 
 func resetGPUFeature(node *NvidiaNode, realMode bool) error {

@@ -317,8 +317,6 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		gpuDevices, memoryDevices []*pluginapi.Device
 		totalMemory               int64
 	)
-	// numa id 默认0
-	numa := 0
 	nodes := ta.tree.Leaves()
 	// 所有的核心数
 	totalCores := len(nodes) * nvtree.HundredCore
@@ -328,12 +326,14 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		totalMemory += int64(nodes[i].Meta.TotalMemory)
 	}
 	totalMemoryBlocks := totalMemory / types.MemoryBlockSize
+	klog.V(2).Infof("totalMemoryBlocks is %d", totalMemoryBlocks)
 	memoryDevices = make([]*pluginapi.Device, totalMemoryBlocks)
 	// 添加numaid相关拓扑信息
 	for i := range nodes {
 		nodeMemory := int64(nodes[i].Meta.TotalMemory)
 		// 取当前节点的numa id
-		numa = nodes[i].Meta.NUMAID
+		numa := nodes[i].Meta.NUMAID
+		klog.V(2).Infof("tree-336-numa: %d", numa)
 		nodeMemoryBlocks := nodeMemory / types.MemoryBlockSize
 		nodegpus := nvtree.HundredCore
 
@@ -368,9 +368,9 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	}
 
 	devs = append(devs, gpuDevices...)
+	klog.V(2).Infof("The gpu devices num is %d", len(devs))
 	devs = append(devs, memoryDevices...)
-
-	return
+	return devs
 }
 
 // #lizard forgives
@@ -827,22 +827,29 @@ func (ta *NvidiaTopoAllocator) ListAndWatch(e *pluginapi.Empty, s pluginapi.Devi
 // ListAndWatchWithResourceName send devices for request resource back to server
 func (ta *NvidiaTopoAllocator) ListAndWatchWithResourceName(resourceName string, e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	devs := make([]*pluginapi.Device, 0)
+	cnt := 0
+	klog.V(2).Infof("allocator-831 ,start deal the resource %s", resourceName)
 	for _, dev := range ta.capacity() {
 		if strings.HasPrefix(dev.ID, resourceName) {
 			devs = append(devs, dev)
+			if cnt%30 == 0 {
+				klog.V(2).Infof("add devID into list ans watch %s", dev.ID)
+				cnt = 1
+			}
+			cnt++
 		}
 	}
-
-	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
-
+	klog.V(2).Infof("total devices num is %d", len(devs))
+	if err := s.Send(&pluginapi.ListAndWatchResponse{Devices: devs}); err != nil {
+		klog.V(2).Infof("send %s resource info failed ", resourceName)
+		return err
+	}
 	// We don't send unhealthy state
 	for {
 		time.Sleep(time.Second)
 	}
-
-	klog.V(2).Infof("ListAndWatch %s exit", resourceName)
-
-	return nil
+	// klog.V(2).Infof("ListAndWatch %s exit", resourceName)
+	// return nil
 }
 
 // GetDevicePluginOptions returns empty DevicePluginOptions

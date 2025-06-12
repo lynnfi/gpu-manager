@@ -40,7 +40,7 @@ import (
 	// Register allocator controller
 	_ "tkestack.io/gpu-manager/pkg/services/allocator/register"
 	"tkestack.io/gpu-manager/pkg/services/display"
-	"tkestack.io/gpu-manager/pkg/services/virtual-manager"
+	vitrual_manager "tkestack.io/gpu-manager/pkg/services/virtual-manager"
 	"tkestack.io/gpu-manager/pkg/services/volume"
 	"tkestack.io/gpu-manager/pkg/services/watchdog"
 	"tkestack.io/gpu-manager/pkg/types"
@@ -71,7 +71,7 @@ type managerImpl struct {
 	srv          *grpc.Server
 }
 
-//NewManager creates and returns a new managerImpl struct
+// NewManager creates and returns a new managerImpl struct
 func NewManager(cfg *config.Config) Manager {
 	manager := &managerImpl{
 		config:       cfg,
@@ -187,7 +187,6 @@ func (m *managerImpl) Run() error {
 
 	m.allocator = initAllocator(m.config, tree, client, responseManager)
 	m.displayer = display.NewDisplay(m.config, tree, containerRuntimeManager)
-
 	klog.V(2).Infof("Starting the GRPC server, driver %s, queryPort %d", m.config.Driver, m.config.QueryPort)
 	m.setupGRPCService()
 	mux, err := m.setupGRPCGatewayService()

@@ -118,5 +118,5 @@ func Run(opt *options.Options) error {
 			klog.Fatalf("inotify: %s", err)
 		}
 	}
-	return nil
+	// return nil
 }

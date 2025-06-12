@@ -42,7 +42,7 @@ type DeviceMeta struct {
 	BusId       string
 	Utilization uint
 	UUID        string
-	NUMAID      int
+	NUMAID      uint
 }
 
 // NvidiaNode represents a node of Nvidia GPU
