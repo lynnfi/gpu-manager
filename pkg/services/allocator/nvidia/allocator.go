@@ -337,9 +337,9 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		nodeMemoryBlocks := nodeMemory / types.MemoryBlockSize
 		nodegpus := nvtree.HundredCore
 
-		for i := 0; i < nodegpus; i++ {
+		for j := 0; j < nodegpus; j++ {
 			gpuDevices[i] = &pluginapi.Device{
-				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, i),
+				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, j),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
 					Nodes: []*pluginapi.NUMANode{
@@ -351,9 +351,9 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 			}
 		}
 
-		for i := int64(0); i < nodeMemoryBlocks; i++ {
+		for k := int64(0); k < nodeMemoryBlocks; k++ {
 			memoryDevices[i] = &pluginapi.Device{
-				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, i),
+				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, k),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
 					Nodes: []*pluginapi.NUMANode{
