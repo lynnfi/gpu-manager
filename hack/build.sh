@@ -48,7 +48,7 @@ function plugin::generate_img() {
 
   mkdir -p "${ROOT}/go/build"
 # /opt/homebrew/opt/gnu-tar/libexec/gnubin/tar czf "${ROOT}/go/build/gpu-manager-source.tar.gz" --transform 's,^,/gpu-manager-'${version}'/,' $(plugin::source_targets)
-   tar czf "${ROOT}/go/build/gpu-manager-source.tar.gz" --transform 's,^,/gpu-manager-'${version}'/,' $(plugin::source_targets)
+# tar czf "${ROOT}/go/build/gpu-manager-source.tar.gz" --transform 's,^,/gpu-manager-'${version}'/,' $(plugin::source_targets)
 #  export DOCKER_BUILDKIT=0
 #  export COMPOSE_DOCKER_CLI_BUILD=0
   cp -R "${ROOT}/build/"* "${ROOT}/go/build/"
