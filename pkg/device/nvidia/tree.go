@@ -21,7 +21,9 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -196,6 +198,26 @@ func (t *NvidiaTree) parseFromLibrary() error {
 		if numaErr != nil {
 			klog.V(2).Infof("get numaID failed,use default numaId=0")
 			klog.V(2).Infof("Error info is %v", numaErr)
+			numaID = 0
+		}
+		// Discard leading zeros.
+		busID := strings.ToLower(strings.TrimPrefix(pciInfo.BusID, "0000"))
+
+		b, err := os.ReadFile(fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", busID))
+
+		if err != nil {
+			klog.V(2).Infof("use default numaId=0, get numaID from pciinfo failed: %v", err)
+			numaID = 0
+		}
+
+		node, err := strconv.Atoi(string(bytes.TrimSpace(b)))
+		if err != nil {
+			klog.V(2).Infof("use default numaId=0,eror parsing value for NUMA node: %v", err)
+			numaID = 0
+		}
+
+		if node < 0 {
+			klog.V(2).Infof("NUMA node not right, use default numaId=0")
 			numaID = 0
 		}
 		klog.V(2).Infof("For %d gpu info, numaID: %d, uuid: %s ", i, numaID, uuid)

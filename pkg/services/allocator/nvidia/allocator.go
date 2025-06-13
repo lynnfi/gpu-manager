@@ -324,7 +324,7 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	// 所有的显存量
 	for i := range nodes {
 		nodeMemory := int64(nodes[i].Meta.TotalMemory)
-		totalMemoryBlocks += nodeMemory / types.MemoryBlockSize
+		totalMemoryBlocks += int64(nodeMemory / types.MemoryBlockSize)
 	}
 	klog.V(2).Infof("totalMemoryBlocks is %d", totalMemoryBlocks)
 	memoryDevices = make([]*pluginapi.Device, totalMemoryBlocks)
@@ -334,11 +334,10 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		// 取当前节点的numa id
 		numa := nodes[i].Meta.NUMAID
 		klog.V(2).Infof("tree-336-numa: %d", numa)
-		nodeMemoryBlocks := nodeMemory / types.MemoryBlockSize
 		nodegpus := nvtree.HundredCore
-
+		nodeMemoryBlocks := int64(nodeMemory / types.MemoryBlockSize)
 		for j := 0; j < nodegpus; j++ {
-			gpuDevices[i] = &pluginapi.Device{
+			gpuDevices[j] = &pluginapi.Device{
 				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, j),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
@@ -352,7 +351,7 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		}
 
 		for k := int64(0); k < nodeMemoryBlocks; k++ {
-			memoryDevices[i] = &pluginapi.Device{
+			memoryDevices[k] = &pluginapi.Device{
 				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, k),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
@@ -368,9 +367,9 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	}
 
 	devs = append(devs, gpuDevices...)
-	klog.V(2).Infof("The gpu devices num is %d", len(devs))
+	klog.V(2).Infof("The gpu devices num is %d", len(gpuDevices))
 	devs = append(devs, memoryDevices...)
-	klog.V(2).Infof("The memroy block num is %d", len(devs))
+	klog.V(2).Infof("The memroy block num is %d", len(memoryDevices))
 	return devs
 }
 
@@ -829,18 +828,22 @@ func (ta *NvidiaTopoAllocator) ListAndWatch(e *pluginapi.Empty, s pluginapi.Devi
 func (ta *NvidiaTopoAllocator) ListAndWatchWithResourceName(resourceName string, e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	devs := make([]*pluginapi.Device, 0)
 	klog.V(2).Infof("allocator-831 ,start deal the resource %s", resourceName)
-	cap := ta.capacity()
-	for i, dev := range cap {
+
+	capacity := ta.capacity()
+	klog.V(2).Infof("Total capacity devices: %d", len(capacity))
+
+	for _, dev := range capacity {
 		if dev != nil {
+			klog.V(2).Infof("Checking device ID: %s", dev.ID)
 			if strings.HasPrefix(dev.ID, resourceName) {
 				devs = append(devs, dev)
-				if i%30 == 0 {
-					klog.V(2).Infof("add devID into list ans watch %s", dev.ID)
-				}
+				klog.V(2).Infof("add devID into list and watch %s", dev.ID)
+			} else {
+				klog.V(2).Infof("Device ID %s does not match prefix %s", dev.ID, resourceName)
 			}
 		}
 	}
-	klog.V(2).Infof("total devices num is %d", len(devs))
+	klog.V(2).Infof("total resource %s devices num is %d", resourceName, len(devs))
 	if err := s.Send(&pluginapi.ListAndWatchResponse{Devices: devs}); err != nil {
 		klog.V(2).Infof("send %s resource info failed ", resourceName)
 		return err
