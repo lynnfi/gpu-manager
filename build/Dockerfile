@@ -22,7 +22,7 @@ RUN yum install -y rpm-build make
 
 #RUN yum remove -y git
 #RUN yum install -y git
-ENV GOLANG_VERSION=1.14.3
+ENV GOLANG_VERSION=1.16.3
 RUN curl -sSL https://dl.google.com/go/go${GOLANG_VERSION}.linux-amd64.tar.gz \
     | tar -C /usr/local -xz
 ENV GOPATH=/go
