@@ -40,7 +40,7 @@ func NewShareMode(t *nvidia.NvidiaTree) *shareMode {
 	return &shareMode{t}
 }
 
-func (al *shareMode) Evaluate(cores int64, memory int64) []*nvidia.NvidiaNode {
+func (al *shareMode) Evaluate(cores int64, memory int64, numa_id int64) []*nvidia.NvidiaNode {
 	var (
 		nodes    []*nvidia.NvidiaNode
 		tmpStore = make([]*nvidia.NvidiaNode, al.tree.Total())
@@ -52,12 +52,26 @@ func (al *shareMode) Evaluate(cores int64, memory int64) []*nvidia.NvidiaNode {
 	}
 
 	sorter.Sort(tmpStore)
-
+	is_find := 0
+	// 第一次尝试，需要严格要求numa匹配
 	for _, node := range tmpStore {
-		if node.AllocatableMeta.Cores >= cores && node.AllocatableMeta.Memory >= memory {
+		if node.Meta.NUMAID == uint(numa_id) && node.AllocatableMeta.Cores >= cores && node.AllocatableMeta.Memory >= memory {
 			klog.V(2).Infof("Pick up %d mask %b, cores: %d, memory: %d, numa: %d", node.Meta.ID, node.Mask, node.AllocatableMeta.Cores, node.AllocatableMeta.Memory, node.Meta.NUMAID)
 			nodes = append(nodes, node)
+			is_find = 1
 			break
+		}
+	}
+	// 第二次尝试，不要求numa严格匹配
+	if is_find == 0 {
+		klog.V(2).Infof("Try not to strictly require numa matching")
+		for _, node := range tmpStore {
+			if node.AllocatableMeta.Cores >= cores && node.AllocatableMeta.Memory >= memory {
+				klog.V(2).Infof("Pick up %d mask %b, cores: %d, memory: %d, numa: %d", node.Meta.ID, node.Mask, node.AllocatableMeta.Cores, node.AllocatableMeta.Memory, node.Meta.NUMAID)
+				nodes = append(nodes, node)
+				is_find = 1
+				break
+			}
 		}
 	}
 

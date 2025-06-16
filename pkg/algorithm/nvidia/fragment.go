@@ -40,7 +40,7 @@ func NewFragmentMode(t *nvidia.NvidiaTree) *fragmentMode {
 	return &fragmentMode{t}
 }
 
-func (al *fragmentMode) Evaluate(cores int64, _ int64) []*nvidia.NvidiaNode {
+func (al *fragmentMode) Evaluate(cores int64, _ int64, numa_id int64) []*nvidia.NvidiaNode {
 	var (
 		candidate = al.tree.Root()
 		next      *nvidia.NvidiaNode
@@ -49,20 +49,37 @@ func (al *fragmentMode) Evaluate(cores int64, _ int64) []*nvidia.NvidiaNode {
 		num       = int(cores / nvidia.HundredCore)
 	)
 
+	is_find := 0
 	for next != candidate {
 		next = candidate
 
 		sorter.Sort(candidate.Children)
 
+		// 第一遍循环，要求numa_id严格匹配
 		for _, node := range candidate.Children {
-			if len(node.Children) == 0 || node.Available() < num {
+			if node.Meta.NUMAID != uint(numa_id) || len(node.Children) == 0 || node.Available() < num {
 				continue
 			}
 
 			candidate = node
+			is_find = 1
 			klog.V(2).Infof("Choose id %d, mask %b, numa: %d", candidate.Meta.ID, candidate.Mask, candidate.Meta.NUMAID)
 			break
 		}
+		// 第二遍循环，不要求numa_id严格匹配
+		if is_find == 0 {
+			klog.V(2).Infof("Try not to strictly require numa matching")
+			for _, node := range candidate.Children {
+				if len(node.Children) == 0 || node.Available() < num {
+					continue
+				}
+
+				candidate = node
+				klog.V(2).Infof("Choose id %d, mask %b, numa: %d", candidate.Meta.ID, candidate.Mask, candidate.Meta.NUMAID)
+				break
+			}
+		}
+
 	}
 
 	for _, n := range candidate.GetAvailableLeaves() {

@@ -29,15 +29,15 @@ type linkMode struct {
 	tree *nvidia.NvidiaTree
 }
 
-//NewLinkMode returns a new linkMode struct.
+// NewLinkMode returns a new linkMode struct.
 //
-//Evaluate() of linkMode returns nodes with minimum connection overhead
-//of each other.
+// Evaluate() of linkMode returns nodes with minimum connection overhead
+// of each other.
 func NewLinkMode(t *nvidia.NvidiaTree) *linkMode {
 	return &linkMode{t}
 }
 
-func (al *linkMode) Evaluate(cores int64, memory int64) []*nvidia.NvidiaNode {
+func (al *linkMode) Evaluate(cores int64, memory int64, _ int64) []*nvidia.NvidiaNode {
 	var (
 		sorter   = linkSort(nvidia.ByType, nvidia.ByAvailable, nvidia.ByAllocatableMemory, nvidia.ByPids, nvidia.ByMinorID)
 		tmpStore = make(map[int]*nvidia.NvidiaNode)

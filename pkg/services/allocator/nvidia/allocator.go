@@ -377,18 +377,51 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	return devs
 }
 
+// 获取对应gpu id
+func getGPUID(device string) (int, error) {
+	// 从 device 字符串中提取 ID
+	parts := strings.Split(device, "-")
+	if len(parts) < 2 {
+		return -1, fmt.Errorf("invalid device format: %s", device)
+	}
+	idStr := parts[len(parts)-1]
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		return -1, fmt.Errorf("invalid ID format: %s", idStr)
+	}
+
+	// 确保 ID 非负
+	if id < 0 {
+		return -1, fmt.Errorf("ID must be non-negative: %d", id)
+	}
+
+	// 根据 ID 范围计算 GPU 编号（每 100 个 ID 对应一个 GPU）
+	gpuID := id / 100
+	return gpuID, nil
+}
+
 // #lizard forgives
 func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container, req *pluginapi.ContainerAllocateRequest) (*pluginapi.ContainerAllocateResponse, error) {
 	var (
-		nodes                       []*nvtree.NvidiaNode
-		needCores, needMemoryBlocks int64
-		predicateMissed             bool
-		allocated                   bool
+		nodes                                []*nvtree.NvidiaNode
+		needCores, needMemoryBlocks, numa_id int64
+		predicateMissed                      bool
+		allocated                            bool
 	)
 
 	predicateMissed = !utils.IsGPUPredicatedPod(pod)
 	singleNodeMemory := int64(ta.tree.Leaves()[0].Meta.TotalMemory)
+	numa_id = -1
 	for _, v := range req.DevicesIDs {
+		// 获取第一个资源的numa_id作为所需numa_id即可
+		if numa_id == -1 && strings.HasPrefix(v, types.VCoreAnnotation) {
+			gpu_id, _ := getGPUID(v)
+			// 获取gpuid失败，返回值为-1
+			if gpu_id < 0 {
+				gpu_id = 0
+			}
+			numa_id = int64(ta.tree.Leaves()[gpu_id].Meta.NUMAID)
+		}
 		if strings.HasPrefix(v, types.VCoreAnnotation) {
 			needCores++
 		} else if strings.HasPrefix(v, types.VMemoryAnnotation) {
@@ -437,7 +470,7 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				return nil, fmt.Errorf("cores are greater than %d, must be multiple of %d", nvtree.HundredCore, nvtree.HundredCore)
 			}
 			for attempt := 0; attempt < maxRetries; attempt++ {
-				nodes = eval.Evaluate(needCores, 0)
+				nodes = eval.Evaluate(needCores, 0, 0)
 				if len(nodes) > 0 {
 					break // 如果找到了节点，就跳出循环
 				}
@@ -452,7 +485,7 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 				return nil, fmt.Errorf("can not find evaluator fragment")
 			}
 			for attempt := 0; attempt < maxRetries; attempt++ {
-				nodes = eval.Evaluate(needCores, 0)
+				nodes = eval.Evaluate(needCores, 0, 0)
 				if len(nodes) > 0 {
 					break // 如果找到了节点，就跳出循环
 				}
@@ -475,8 +508,9 @@ func (ta *NvidiaTopoAllocator) allocateOne(pod *v1.Pod, container *v1.Container,
 			if !ok {
 				return nil, fmt.Errorf("can not find evaluator share")
 			}
+
 			for attempt := 0; attempt < maxRetries; attempt++ {
-				nodes = eval.Evaluate(needCores, needMemory)
+				nodes = eval.Evaluate(needCores, needMemory, numa_id)
 				if len(nodes) > 0 {
 					break // 如果找到了节点，就跳出循环
 				}

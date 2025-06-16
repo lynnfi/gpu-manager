@@ -23,5 +23,5 @@ import (
 
 // Evaluator api for schedule algorithm
 type Evaluator interface {
-	Evaluate(cores int64, memory int64) []*node.NvidiaNode
+	Evaluate(cores int64, memory int64, numa_id int64) []*node.NvidiaNode
 }
