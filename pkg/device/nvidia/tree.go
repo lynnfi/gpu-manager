@@ -202,24 +202,21 @@ func (t *NvidiaTree) parseFromLibrary() error {
 		}
 		// Discard leading zeros.
 		busID := strings.ToLower(strings.TrimPrefix(pciInfo.BusID, "0000"))
-
+		klog.V(2).Infof("get busID succeed,busID: %s", busID)
 		b, err := os.ReadFile(fmt.Sprintf("/sys/bus/pci/devices/%s/numa_node", busID))
-
+		node, err := strconv.Atoi(string(bytes.TrimSpace(b)))
 		if err != nil {
 			klog.V(2).Infof("use default numaId=0, get numaID from pciinfo failed: %v", err)
 			numaID = 0
 		}
-
-		node, err := strconv.Atoi(string(bytes.TrimSpace(b)))
-		if err != nil {
-			klog.V(2).Infof("use default numaId=0,eror parsing value for NUMA node: %v", err)
-			numaID = 0
-		}
-
-		if node < 0 {
+		if node >= 0 {
+			numaID = uint(node)
+			klog.V(2).Infof("find NUMA node from pci info")
+		} else {
 			klog.V(2).Infof("NUMA node not right, use default numaId=0")
 			numaID = 0
 		}
+
 		klog.V(2).Infof("For %d gpu info, numaID: %d, uuid: %s ", i, numaID, uuid)
 		n := t.allocateNode(i)
 		n.AllocatableMeta.Cores = HundredCore

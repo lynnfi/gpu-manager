@@ -1,5 +1,5 @@
 ARG base_img
-FROM  10.199.2.148:5000/robocloud/nvidia-cuda:11.0.3-devel-centos7 as build
+FROM  10.199.2.148:5000/robocloud/nvidia-cuda:11.0.3-devel-centos7 AS build
 #FROM nvidia/cuda:11.0.3-devel-centos7 as build
 #FROM nvidia/cuda:11.0.3-devel-ubuntu20.04 as build
 #FROM nvidia/cuda:10.1-devel-centos7 as build
@@ -46,7 +46,7 @@ RUN rpmbuild -bb --quiet \
   --define 'commit '${commit}'' \
   gpu-manager.spec
 
-#
+
 FROM $base_img
 
 ARG version
