@@ -328,6 +328,8 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 	}
 	klog.V(2).Infof("totalMemoryBlocks is %d", totalMemoryBlocks)
 	memoryDevices = make([]*pluginapi.Device, totalMemoryBlocks)
+	core_index := 0
+	memory_index := 0
 	// 添加numaid相关拓扑信息
 	for i := range nodes {
 		nodeMemory := int64(nodes[i].Meta.TotalMemory)
@@ -337,8 +339,8 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 		nodegpus := nvtree.HundredCore
 		nodeMemoryBlocks := int64(nodeMemory / types.MemoryBlockSize)
 		for j := 0; j < nodegpus; j++ {
-			gpuDevices[j] = &pluginapi.Device{
-				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, j),
+			gpuDevices[core_index] = &pluginapi.Device{
+				ID:     fmt.Sprintf("%s-%d", types.VCoreAnnotation, core_index),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
 					Nodes: []*pluginapi.NUMANode{
@@ -348,11 +350,12 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 					},
 				},
 			}
+			core_index++
 		}
 
 		for k := int64(0); k < nodeMemoryBlocks; k++ {
-			memoryDevices[k] = &pluginapi.Device{
-				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, k),
+			memoryDevices[memory_index] = &pluginapi.Device{
+				ID:     fmt.Sprintf("%s-%d-%d", types.VMemoryAnnotation, types.MemoryBlockSize, memory_index),
 				Health: pluginapi.Healthy,
 				Topology: &pluginapi.TopologyInfo{
 					Nodes: []*pluginapi.NUMANode{
@@ -362,6 +365,7 @@ func (ta *NvidiaTopoAllocator) capacity() (devs []*pluginapi.Device) {
 					},
 				},
 			}
+			memory_index++
 		}
 
 	}

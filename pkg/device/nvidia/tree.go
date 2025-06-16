@@ -194,12 +194,14 @@ func (t *NvidiaTree) parseFromLibrary() error {
 		pciInfo, _ := dev.DeviceGetPciInfo()
 		minorID, _ := dev.DeviceGetMinorNumber()
 		uuid, _ := dev.DeviceGetUUID()
-		numaID, numaErr := dev.DeviceGetNumaNodeId()
-		if numaErr != nil {
-			klog.V(2).Infof("get numaID failed,use default numaId=0")
-			klog.V(2).Infof("Error info is %v", numaErr)
-			numaID = 0
-		}
+		// 不再依赖nvml方法获取numa id
+		// // numaID, numaErr := dev.DeviceGetNumaNodeId()
+		// if numaErr != nil {
+		// 	klog.V(2).Infof("get numaID failed,use default numaId=0")
+		// 	klog.V(2).Infof("Error info is %v", numaErr)
+		// 	numaID = 0
+		// }
+		numaID := 0
 		// Discard leading zeros.
 		busID := strings.ToLower(strings.TrimPrefix(pciInfo.BusID, "0000"))
 		klog.V(2).Infof("get busID succeed,busID: %s", busID)
@@ -213,7 +215,7 @@ func (t *NvidiaTree) parseFromLibrary() error {
 			numaID = uint(node)
 			klog.V(2).Infof("find NUMA node from pci info")
 		} else {
-			klog.V(2).Infof("NUMA node not right, use default numaId=0")
+			klog.V(2).Infof("NUMA node not right, pci return numaId: %d", numaID)
 			numaID = 0
 		}
 
